@@ -43,8 +43,7 @@ def main() -> None:
                 print("Stopped receiving frames from the camera.")
                 break
 
-            cv2.imshow("Camera", frame)  # Show a smaller image to fit on the screen.
-            
+            cv2.imshow("Camera", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
     finally:

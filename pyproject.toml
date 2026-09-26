@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camera-feed"
+version = "0.1.0"
+description = "Live USB webcam preview using OpenCV"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "opencv-python-headless",
+]
+
+[project.scripts]
+camera-feed = "camera_feed:main"
+
+[tool.setuptools]
+py-modules = ["camera_feed"]

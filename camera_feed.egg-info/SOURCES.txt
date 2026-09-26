@@ -1,0 +1,9 @@
+README.md
+camera_feed.py
+pyproject.toml
+camera_feed.egg-info/PKG-INFO
+camera_feed.egg-info/SOURCES.txt
+camera_feed.egg-info/dependency_links.txt
+camera_feed.egg-info/entry_points.txt
+camera_feed.egg-info/requires.txt
+camera_feed.egg-info/top_level.txt
