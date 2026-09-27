@@ -28,6 +28,8 @@ NMS_IOU = 0.5
 CONF = 0.25
 USE_LOCAL = False
 latest: queue.Queue[bytes] = queue.Queue(maxsize=1)
+commands: queue.Queue[str] = queue.Queue()
+last_command = ""
 
 
 def load_env() -> None:
@@ -46,10 +48,36 @@ def load_env() -> None:
                 os.environ[key] = value
 
 
+def pop_command() -> str | None:
+    """Newest direction waiting to be sent. Older ones are dropped."""
+    latest_command = None
+    while True:
+        try:
+            latest_command = commands.get_nowait()
+        except queue.Empty:
+            return latest_command
+
+
+def queue_command(command: str | None) -> None:
+    global last_command
+    if not command or command == last_command:
+        return
+    last_command = command
+    commands.put(command)
+
+
 def receive(connection) -> None:
     print("Pi connected.")
     try:
+        command = pop_command() or last_command
+        if command:
+            connection.send(command)
         for message in connection:
+            command = pop_command()
+            if command:
+                connection.send(command)
+            if not isinstance(message, (bytes, bytearray)):
+                continue
             if latest.full():
                 latest.get_nowait()
             latest.put(message)
@@ -541,6 +569,7 @@ def main() -> None:
                 2,
             )
             cv2.imshow("FastSAM", shown)
+            queue_command(given_direction())
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
     finally:

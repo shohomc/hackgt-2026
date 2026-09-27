@@ -1,6 +1,8 @@
 """Send each webcam frame to the laptop through the ngrok address it prints.
 
-    pip install websockets
+Directions that come back are written to the Arduino on /dev/ttyACM0.
+
+    pip install websockets pyserial
     python3 pi/stream.py wss://YOUR-TUNNEL.ngrok-free.app
     python3 pi/stream.py wss://YOUR-TUNNEL.ngrok-free.app 1
 """
@@ -14,6 +16,45 @@ from websockets.sync.client import connect
 from camera import open_camera
 
 CONNECT_TIMEOUT = 3 * 60
+
+
+def open_arduino():
+    """USB serial to the chariot sketch. None when the board is absent."""
+    try:
+        import serial
+    except ImportError:
+        print("pip install pyserial to drive the Arduino.", flush=True)
+        return None
+    for path in ("/dev/ttyACM0", "/dev/ttyUSB0"):
+        try:
+            link = serial.Serial(path, 9600, timeout=0)
+        except Exception:
+            continue
+        time.sleep(2)
+        print(f"Arduino on {path}", flush=True)
+        return link
+    print("No Arduino on /dev/ttyACM0 or /dev/ttyUSB0.", flush=True)
+    return None
+
+
+def forward_commands(ws, link) -> None:
+    while True:
+        try:
+            message = ws.recv(timeout=0)
+        except TimeoutError:
+            return
+        if not isinstance(message, str):
+            continue
+        command = message.strip()
+        if not command:
+            continue
+        print(f"Arduino: {command}", flush=True)
+        if link is None:
+            continue
+        try:
+            link.write((command + "\n").encode())
+        except Exception as error:
+            print(f"Arduino write failed ({error})", flush=True)
 
 
 def main() -> None:
@@ -35,6 +76,7 @@ def main() -> None:
         print(f"Could not open camera {camera}.")
         sys.exit(1)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    link = open_arduino()
 
     disconnected_since = time.monotonic()
     try:
@@ -55,6 +97,7 @@ def main() -> None:
                     print("Connected. Streaming the camera at half size.")
                     disconnected_since = None
                     while True:
+                        forward_commands(ws, link)
                         ok, frame = cap.read()
                         if not ok:
                             print("Camera stopped sending frames.")
@@ -79,6 +122,8 @@ def main() -> None:
                 time.sleep(1)
     finally:
         cap.release()
+        if link is not None:
+            link.close()
 
 
 if __name__ == "__main__":

@@ -40,3 +40,13 @@ Check it:
 
 systemctl status hackgt-stream.service
 journalctl -u hackgt-stream.service -f
+
+Arduino:
+
+Plug the Arduino USB port into the Pi. Flash arduino/chariot from the Arduino IDE first.
+The stream writes each direction to /dev/ttyACM0 at 9600 baud.
+
+pip install pyserial
+sudo usermod -a -G dialout pi
+
+Log out and back in so the dialout group applies, then restart the stream service.
