@@ -1,19 +1,29 @@
 """Send each webcam frame to the laptop over a WebSocket.
 
 No YOLO on the Pi. The laptop script receives these frames.
+Same Wi-Fi uses ws://. ngrok uses the wss:// address the laptop prints.
 
     pip install websockets
-    python3 pi_stream.py ws://LAPTOP_IP:8765
+    python3 pi_stream.py wss://YOUR-TUNNEL.ngrok-free.app
     python3 pi_stream.py ws://LAPTOP_IP:8765 1
 """
 
 import sys
 import time
+from urllib.parse import urlparse
 
 import cv2
 from websockets.sync.client import connect
 
 from camera_feed import open_camera
+
+
+def connect_headers(url: str) -> dict[str, str]:
+    host = urlparse(url).hostname or ""
+    if "ngrok" in host:
+        # ngrok's free tunnels show a browser warning unless this header is set.
+        return {"ngrok-skip-browser-warning": "1"}
+    return {}
 
 
 def main() -> None:
@@ -40,7 +50,12 @@ def main() -> None:
         while True:
             print(f"Connecting to {url}")
             try:
-                with connect(url, max_size=8_000_000, compression=None) as ws:
+                with connect(
+                    url,
+                    max_size=8_000_000,
+                    compression=None,
+                    additional_headers=connect_headers(url),
+                ) as ws:
                     print("Connected. Streaming the camera.")
                     while True:
                         ok, frame = cap.read()
