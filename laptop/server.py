@@ -58,11 +58,19 @@ def pop_command() -> str | None:
             return latest_command
 
 
+COMMAND_REPEAT = 1.0
+command_sent_at = 0.0
+
+
 def queue_command(command: str | None) -> None:
-    global last_command
-    if not command or command == last_command:
+    global last_command, command_sent_at
+    if not command:
+        return
+    now = time.time()
+    if command == last_command and now - command_sent_at < COMMAND_REPEAT:
         return
     last_command = command
+    command_sent_at = now
     commands.put(command)
 
 
@@ -142,11 +150,13 @@ TURN = Noul(
         "Should the person turn at all? "
         "Yes only when a collision looks immediate: a mask persists across the frames, sits in the path ahead, "
         "and its average_depth_m is near that frame's depth_p10_m. "
-        "No when the center is clear or the mask is nearer depth_p90_m."
+        "No when the center is clear or the mask is nearer depth_p90_m. "
+        "direction_given is history. A run of stops or of the same turn is not a reason to turn again. "
+        "After several frames of one direction, look for the next chance to go forward if the obstacles allow it."
     ),
     criteria={
         "true": "A turn should be made. A persisted obstacle is in the path and a collision looks immediate.",
-        "false": "No turn. Keep the current heading. Nothing immediate is in the path.",
+        "false": "No turn. Go forward. Nothing immediate is in the path. Do not repeat the last direction just because recent frames used it.",
     },
 )
 
@@ -155,11 +165,13 @@ STOP = Noul(
         "Is a stop preferred over continuing? "
         "Yes when the path ahead changes suddenly: a close mask appears that was absent in the older frames, "
         "or a mask already in the path jumps to the close end. "
-        "No when the person can keep walking, including by turning."
+        "No when the person can keep walking, including by turning. "
+        "If recent frames already say stop, do not keep the device stopped. "
+        "Look for the next chance to move, if any obstacle still allows it. A past stop is not itself a reason to stop."
     ),
     criteria={
-        "true": "Stop. The path ahead changed suddenly.",
-        "false": "Keep navigating. Continuing, straight or by a turn, is preferred.",
+        "true": "Stop. The path ahead just changed suddenly. This is a new reason to stop, not a repeat of earlier stop frames.",
+        "false": "Move again. Continuing, straight or by a turn, is preferred. A run of earlier stops is not a reason to stay stopped.",
     },
 )
 
@@ -171,7 +183,10 @@ DIRECTION = Choice(
         "x_center is 0 at the left edge and 1 at the right edge. "
         "A soft turn is about 20 degrees. A hard turn is a sharp turn of about 45 degrees. "
         "Use a soft turn when the obstacle stays on one side and leaves the center open. "
-        "Use a hard turn when it reaches into the center, around x 0.5."
+        "Use a hard turn when it reaches into the center, around x 0.5. "
+        "direction_given is history. If recent frames are already the same turn, such as a run of hard left, "
+        "do not repeat it unless an obstacle still requires that same turn. "
+        "Look for the next chance to turn a different way. The choice still depends on the obstacles."
     ),
     criteria={
         "hard left": "Turn sharply left, about 45 degrees. The obstacle is on the right and reaches into the center of the image.",
@@ -338,8 +353,12 @@ def jev_state() -> dict:
             "or a mask already in the path jumps to the close end. "
             "A smaller value means closer, but the scale can jump, so compare depths within these frames. "
             "Frames are listed oldest first and newest last. "
-            "direction_given is the direction already shown to the person for that frame. "
-            "Keep it unless the scene has changed."
+            "direction_given is the direction already shown for that frame. It is history, not an instruction to repeat. "
+            "A run of the same direction_given means that move has already happened. "
+            "Do not keep stopping because recent frames say stop. Look for the next chance to move if the obstacles allow it. "
+            "Do not keep turning the same way, such as hard left, because recent frames say hard left. "
+            "Look for the next chance to turn a different way or go forward if the obstacles allow it. "
+            "The same applies to any repeated direction. Decide from the obstacles in the newest frames."
         ),
         "frames_oldest_first": list(recent_frames),
     }
