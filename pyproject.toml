@@ -15,7 +15,10 @@ dependencies = [
 ]
 
 [project.scripts]
-camera-feed = "camera_feed:main"
+camera-feed = "camera:main"
 
 [tool.setuptools]
-py-modules = ["camera_feed"]
+py-modules = ["camera"]
+
+[tool.setuptools.package-dir]
+"" = "pi"

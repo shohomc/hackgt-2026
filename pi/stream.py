@@ -1,8 +1,8 @@
 """Send each webcam frame to the laptop through the ngrok address it prints.
 
     pip install websockets
-    python3 pi_stream.py wss://YOUR-TUNNEL.ngrok-free.app
-    python3 pi_stream.py wss://YOUR-TUNNEL.ngrok-free.app 1
+    python3 pi/stream.py wss://YOUR-TUNNEL.ngrok-free.app
+    python3 pi/stream.py wss://YOUR-TUNNEL.ngrok-free.app 1
 """
 
 import sys
@@ -11,12 +11,12 @@ import time
 import cv2
 from websockets.sync.client import connect
 
-from camera_feed import open_camera
+from camera import open_camera
 
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: python3 pi_stream.py wss://YOUR-TUNNEL.ngrok-free.app [camera]")
+        print("Usage: python3 pi/stream.py wss://YOUR-TUNNEL.ngrok-free.app [camera]")
         sys.exit(1)
 
     url = sys.argv[1]
@@ -45,8 +45,6 @@ def main() -> None:
                     additional_headers={"ngrok-skip-browser-warning": "1"},
                 ) as ws:
                     print("Connected. Streaming the camera at half size.")
-                    sent = 0
-                    last_report = time.perf_counter()
                     while True:
                         ok, frame = cap.read()
                         if not ok:
@@ -58,14 +56,8 @@ def main() -> None:
                             cv2.pyrDown(frame),
                             [int(cv2.IMWRITE_JPEG_QUALITY), 70],
                         )
-                        if not ok:
-                            continue
-                        payload = jpg.tobytes()
-                        ws.send(payload)
-                        sent += len(payload)
-                        if time.perf_counter() - last_report >= 5:
-                            print(f"sent {sent / 1_048_576:.1f} MB this connection")
-                            last_report = time.perf_counter()
+                        if ok:
+                            ws.send(jpg.tobytes())
             except KeyboardInterrupt:
                 raise
             except Exception as error:

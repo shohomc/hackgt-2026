@@ -3,7 +3,7 @@
 Run on the Pi desktop (or a VNC session). Press q to quit.
 Pass a different camera index if /dev/video0 is not the webcam:
 
-    python3 camera_feed.py 1
+    python3 pi/camera.py 1
 """
 
 import sys
@@ -26,7 +26,7 @@ def main() -> None:
         try:
             index = int(sys.argv[1])
         except ValueError:
-            print("Camera index must be a number, for example: python3 camera_feed.py 0")
+            print("Camera index must be a number, for example: python3 pi/camera.py 0")
             sys.exit(1)
 
     cap = open_camera(index)

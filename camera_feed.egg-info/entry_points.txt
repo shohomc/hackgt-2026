@@ -1,2 +1,0 @@
-[console_scripts]
-camera-feed = camera_feed:main
