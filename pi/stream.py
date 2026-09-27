@@ -13,6 +13,8 @@ from websockets.sync.client import connect
 
 from camera import open_camera
 
+CONNECT_TIMEOUT = 3 * 60
+
 
 def main() -> None:
     if len(sys.argv) < 2:
@@ -34,17 +36,24 @@ def main() -> None:
         sys.exit(1)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
+    disconnected_since = time.monotonic()
     try:
         while True:
+            waited = time.monotonic() - disconnected_since
+            if waited >= CONNECT_TIMEOUT:
+                print("No connection within 3 minutes. Stopping.")
+                return
             print(f"Connecting to {url}")
             try:
                 with connect(
                     url,
                     max_size=8_000_000,
                     compression=None,
+                    open_timeout=CONNECT_TIMEOUT - waited,
                     additional_headers={"ngrok-skip-browser-warning": "1"},
                 ) as ws:
                     print("Connected. Streaming the camera at half size.")
+                    disconnected_since = None
                     while True:
                         ok, frame = cap.read()
                         if not ok:
@@ -61,6 +70,11 @@ def main() -> None:
             except KeyboardInterrupt:
                 raise
             except Exception as error:
+                if disconnected_since is None:
+                    disconnected_since = time.monotonic()
+                if time.monotonic() - disconnected_since >= CONNECT_TIMEOUT:
+                    print("No connection within 3 minutes. Stopping.")
+                    return
                 print(f"Connection lost ({error}). Retrying...")
                 time.sleep(1)
     finally:
