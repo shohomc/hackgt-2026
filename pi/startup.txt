@@ -1,0 +1,42 @@
+Start the camera stream when the Pi boots.
+
+The address is the wss:// URL printed by the laptop (python laptop/server.py).
+It changes whenever ngrok restarts. Put the current one in /etc/hackgt-stream.env.
+Change pi and /home/pi/hackgt-2026 if that is not the account and folder on the Pi.
+Start the laptop server first, or the Pi retries for 3 minutes and then exits.
+Restart=always starts it again 5 seconds later, including after a reboot.
+
+sudo tee /etc/hackgt-stream.env >/dev/null <<'EOF'
+WSS_URL=wss://THE-URL-PRINTED
+EOF
+
+sudo tee /etc/systemd/system/hackgt-stream.service >/dev/null <<'EOF'
+[Unit]
+Description=HackGT camera stream
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/hackgt-2026
+EnvironmentFile=/etc/hackgt-stream.env
+ExecStart=/usr/bin/python3 /home/pi/hackgt-2026/pi/stream.py $WSS_URL
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now hackgt-stream.service
+
+When the laptop prints a new tunnel:
+
+sudo nano /etc/hackgt-stream.env
+sudo systemctl restart hackgt-stream.service
+
+Check it:
+
+systemctl status hackgt-stream.service
+journalctl -u hackgt-stream.service -f
