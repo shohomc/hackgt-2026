@@ -1,16 +1,12 @@
-"""Send each webcam frame to the laptop over a WebSocket.
-
-No YOLO on the Pi. The laptop script receives these frames.
-Same Wi-Fi uses ws://. ngrok uses the wss:// address the laptop prints.
+"""Send each webcam frame to the laptop through the ngrok address it prints.
 
     pip install websockets
     python3 pi_stream.py wss://YOUR-TUNNEL.ngrok-free.app
-    python3 pi_stream.py ws://LAPTOP_IP:8765 1
+    python3 pi_stream.py wss://YOUR-TUNNEL.ngrok-free.app 1
 """
 
 import sys
 import time
-from urllib.parse import urlparse
 
 import cv2
 from websockets.sync.client import connect
@@ -18,17 +14,9 @@ from websockets.sync.client import connect
 from camera_feed import open_camera
 
 
-def connect_headers(url: str) -> dict[str, str]:
-    host = urlparse(url).hostname or ""
-    if "ngrok" in host:
-        # ngrok's free tunnels show a browser warning unless this header is set.
-        return {"ngrok-skip-browser-warning": "1"}
-    return {}
-
-
 def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: python3 pi_stream.py ws://LAPTOP_IP:8765 [camera]")
+        print("Usage: python3 pi_stream.py wss://YOUR-TUNNEL.ngrok-free.app [camera]")
         sys.exit(1)
 
     url = sys.argv[1]
@@ -54,19 +42,30 @@ def main() -> None:
                     url,
                     max_size=8_000_000,
                     compression=None,
-                    additional_headers=connect_headers(url),
+                    additional_headers={"ngrok-skip-browser-warning": "1"},
                 ) as ws:
-                    print("Connected. Streaming the camera.")
+                    print("Connected. Streaming the camera at half size.")
+                    sent = 0
+                    last_report = time.perf_counter()
                     while True:
                         ok, frame = cap.read()
                         if not ok:
                             print("Camera stopped sending frames.")
                             return
+                        # Half width and height before the bytes go through ngrok.
                         ok, jpg = cv2.imencode(
-                            ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70]
+                            ".jpg",
+                            cv2.pyrDown(frame),
+                            [int(cv2.IMWRITE_JPEG_QUALITY), 70],
                         )
-                        if ok:
-                            ws.send(jpg.tobytes())
+                        if not ok:
+                            continue
+                        payload = jpg.tobytes()
+                        ws.send(payload)
+                        sent += len(payload)
+                        if time.perf_counter() - last_report >= 5:
+                            print(f"sent {sent / 1_048_576:.1f} MB this connection")
+                            last_report = time.perf_counter()
             except KeyboardInterrupt:
                 raise
             except Exception as error:
