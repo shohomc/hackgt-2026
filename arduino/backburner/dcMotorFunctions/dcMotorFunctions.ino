@@ -126,23 +126,21 @@ String readLatest() {
   return latest;
 }
 
-// Hold this heading. Before centering, read serial again.
-// The same command means stay for another 3 seconds.
-void holdIfStill(const String& command) {
+// Read the newest line. The same command means do another period.
+// A different command is saved for loop().
+bool sameCommand(const String& command) {
 
-  delay(3000);
+  String latest = readLatest();
 
-  while (true) {
-    String latest = readLatest();
-    if (latest == command) {
-      delay(3000);
-      continue;
-    }
-    if (latest.length() > 0) {
-      pendingCommand = latest;
-    }
-    return;
+  if (latest == command) {
+    return true;
   }
+
+  if (latest.length() > 0) {
+    pendingCommand = latest;
+  }
+
+  return false;
 }
 
 
@@ -165,6 +163,9 @@ void returnToCenter() {
     else if (distance == 45) {
       moveRight(TIME_45_DEG*2, RETURN_SPEED);
     }
+    else if (distance == 90) {
+      moveRight(TIME_90_DEG, RETURN_SPEED);
+    }
 
   }
 
@@ -181,6 +182,9 @@ void returnToCenter() {
     else if (distance == 45) {
       moveLeft(TIME_45_DEG*2, RETURN_SPEED);
     }
+    else if (distance == 90) {
+      moveLeft(TIME_90_DEG, RETURN_SPEED);
+    }
   }
 
   // We are now assumed to be centered
@@ -194,14 +198,17 @@ void returnToCenter() {
 
 void slightLeft() {
 
-  // Move 20 degrees left
-  moveLeft(TIME_20_DEG, MOTOR_SPEED);
+  do {
+    // Start from center, then move 20 degrees left
+    returnToCenter();
 
-  position = -20;
+    moveLeft(TIME_20_DEG, MOTOR_SPEED);
 
-  holdIfStill("soft left");
+    position = -20;
 
-  // Slowly return to center
+    delay(3000);
+  } while (sameCommand("soft left"));
+
   returnToCenter();
 }
 
@@ -212,14 +219,16 @@ void slightLeft() {
 
 void hardLeft() {
 
-  // Move 45 degrees left
-  moveLeft(TIME_45_DEG, MOTOR_SPEED);
+  do {
+    returnToCenter();
 
-  position = -45;
+    moveLeft(TIME_45_DEG, MOTOR_SPEED);
 
-  holdIfStill("hard left");
+    position = -45;
 
-  // Slowly return to center
+    delay(3000);
+  } while (sameCommand("hard left"));
+
   returnToCenter();
 }
 
@@ -230,14 +239,16 @@ void hardLeft() {
 
 void slightRight() {
 
-  // Move 20 degrees right
-  moveRight(TIME_20_DEG, MOTOR_SPEED);
+  do {
+    returnToCenter();
 
-  position = 20;
+    moveRight(TIME_20_DEG, MOTOR_SPEED);
 
-  holdIfStill("soft right");
+    position = 20;
 
-  // Slowly return to center
+    delay(3000);
+  } while (sameCommand("soft right"));
+
   returnToCenter();
 }
 
@@ -248,14 +259,16 @@ void slightRight() {
 
 void hardRight() {
 
-  // Move 45 degrees right
-  moveRight(TIME_45_DEG, MOTOR_SPEED);
+  do {
+    returnToCenter();
 
-  position = 45;
+    moveRight(TIME_45_DEG, MOTOR_SPEED);
 
-  holdIfStill("hard right");
+    position = 45;
 
-  // Slowly return to center
+    delay(3000);
+  } while (sameCommand("hard right"));
+
   returnToCenter();
 }
 
@@ -266,21 +279,20 @@ void hardRight() {
 
 void brake() {
 
-  // Move 90 degrees left
-  moveLeft(TIME_90_DEG, MOTOR_SPEED);
+  do {
+    returnToCenter();
 
-  position = -90;
+    // Move 90 degrees left
+    moveLeft(TIME_90_DEG, MOTOR_SPEED);
 
-  holdIfStill("stop");
+    position = -90;
 
-  // Return to center
-  //
+    delay(3000);
+  } while (sameCommand("stop"));
+
   // Since we don't have a sensor, use the
   // 90-degree calibrated time.
-
-  moveRight(TIME_90_DEG, RETURN_SPEED);
-
-  position = 0;
+  returnToCenter();
 }
 
 
